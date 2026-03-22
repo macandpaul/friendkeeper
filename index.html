@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Friendkeeper</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f0e8;
+    --card: #fffdf8;
+    --accent: #c4773b;
+    --accent-light: #f0e4d4;
+    --text: #2c2416;
+    --text-muted: #8a7560;
+    --border: #e0d5c5;
+    --reminder: #d45c3a;
+    --reminder-bg: #fdf0ec;
+    --green: #4a7c59;
+    --green-bg: #edf4ef;
+    --shadow: 0 2px 12px rgba(44,36,22,0.08);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 20px 14px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .app-title { font-family: 'Lora', serif; font-size: 22px; font-weight: 600; color: var(--accent); letter-spacing: -0.3px; }
+  .app-subtitle { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; }
+  .header-actions { display: flex; align-items: center; gap: 8px; }
+  .sync-btn {
+    background: none; border: 1.5px solid var(--border); border-radius: 8px;
+    padding: 6px 10px; font-size: 12px; color: var(--text-muted); cursor: pointer;
+    font-family: 'DM Sans', sans-serif; display: flex; align-items: center; gap: 5px;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .sync-btn.synced { border-color: var(--green); color: var(--green); }
+  .sync-btn.syncing { opacity: 0.6; }
+  .add-btn {
+    background: var(--accent); color: white; border: none; border-radius: 50%;
+    width: 40px; height: 40px; font-size: 22px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: background 0.15s, transform 0.1s;
+  }
+  .add-btn:active { transform: scale(0.93); background: #a85e28; }
+  .search-wrap { position: relative; }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 15px; pointer-events: none; }
+  .search-input {
+    width: 100%; padding: 10px 12px 10px 36px; border: 1.5px solid var(--border);
+    border-radius: 10px; background: var(--bg); font-family: 'DM Sans', sans-serif;
+    font-size: 15px; color: var(--text); outline: none; transition: border-color 0.15s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  /* TABS */
+  .tabs { display: flex; background: var(--card); border-bottom: 1px solid var(--border); padding: 0 20px; }
+  .tab {
+    flex: 1; padding: 10px 0; font-size: 13px; font-weight: 500; color: var(--text-muted);
+    border: none; background: none; cursor: pointer; border-bottom: 2.5px solid transparent;
+    transition: color 0.15s, border-color 0.15s; text-align: center;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* LISTS */
+  .list-wrap { padding: 16px 16px 100px; }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; line-height: 1.6; }
+
+  /* PERSON CARD */
+  .person-card {
+    background: var(--card); border-radius: var(--radius); margin-bottom: 10px;
+    border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden;
+    cursor: pointer; transition: transform 0.12s;
+  }
+  .person-card:active { transform: scale(0.98); }
+  .person-card-inner { padding: 14px 16px; display: flex; align-items: center; gap: 13px; }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%; background: var(--accent-light);
+    color: var(--accent); font-family: 'Lora', serif; font-size: 17px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .person-info { flex: 1; min-width: 0; }
+  .person-name { font-family: 'Lora', serif; font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .person-preview { font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .person-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+  .note-count { font-size: 11px; color: var(--text-muted); background: var(--bg); padding: 2px 7px; border-radius: 20px; border: 1px solid var(--border); }
+  .reminder-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--reminder); }
+
+  /* REMINDER CARD */
+  .reminder-card { background: var(--card); border-radius: var(--radius); margin-bottom: 10px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; cursor: pointer; }
+  .reminder-card-inner { padding: 14px 16px; display: flex; gap: 13px; align-items: flex-start; }
+  .reminder-date-block { background: var(--reminder-bg); border: 1px solid #f0cfc6; border-radius: 10px; padding: 6px 10px; text-align: center; flex-shrink: 0; min-width: 48px; }
+  .reminder-date-block.past { background: #f5f5f5; border-color: #ddd; }
+  .reminder-date-block.today { background: #fff3e0; border-color: #ffc68a; }
+  .rdate-day { font-size: 20px; font-weight: 600; color: var(--reminder); line-height: 1; }
+  .rdate-mon { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--reminder); }
+  .reminder-date-block.past .rdate-day, .reminder-date-block.past .rdate-mon { color: #999; }
+  .reminder-date-block.today .rdate-day, .reminder-date-block.today .rdate-mon { color: #e07000; }
+  .reminder-body { flex: 1; min-width: 0; }
+  .reminder-person { font-size: 12px; color: var(--text-muted); margin-bottom: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; }
+  .reminder-text { font-family: 'Lora', serif; font-size: 15px; color: var(--text); line-height: 1.4; }
+  .reminder-dismiss { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 11px; color: var(--text-muted); cursor: pointer; flex-shrink: 0; font-family: 'DM Sans', sans-serif; }
+
+  /* OVERLAY */
+  .overlay { position: fixed; inset: 0; background: rgba(44,36,22,0.45); z-index: 200; display: none; align-items: flex-end; justify-content: center; }
+  .overlay.open { display: flex; }
+  .sheet { background: var(--card); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto; padding: 0 0 40px; animation: slideUp 0.22s ease; }
+  @keyframes slideUp { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 0; }
+  .sheet-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; }
+  .sheet-avatar { width: 50px; height: 50px; border-radius: 50%; background: var(--accent-light); color: var(--accent); font-family: 'Lora', serif; font-size: 20px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sheet-person-name { font-family: 'Lora', serif; font-size: 20px; font-weight: 600; flex: 1; }
+  .sheet-header-actions { display: flex; gap: 6px; align-items: center; }
+  .sheet-close { background: var(--bg); border: 1px solid var(--border); border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+  .icon-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 5px 9px; font-size: 13px; cursor: pointer; color: var(--text-muted); font-family: 'DM Sans', sans-serif; transition: background 0.12s; white-space: nowrap; }
+  .icon-btn:active { background: var(--accent-light); }
+  .delete-person-btn { background: none; border: none; color: #c0392b; font-size: 13px; cursor: pointer; padding: 4px 8px; font-family: 'DM Sans', sans-serif; }
+  .sheet-body { padding: 16px 20px; }
+  .section-label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 10px; }
+
+  /* NOTES */
+  .note-item { background: var(--bg); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid var(--border); }
+  .note-item-text { font-size: 14px; line-height: 1.55; color: var(--text); white-space: pre-wrap; }
+  .note-item-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; flex-wrap: wrap; gap: 4px; }
+  .note-item-date { font-size: 11px; color: var(--text-muted); }
+  .note-reminder-badge { font-size: 11px; background: var(--reminder-bg); color: var(--reminder); border: 1px solid #f0cfc6; padding: 2px 8px; border-radius: 20px; }
+  .note-delete { background: none; border: none; color: #ccc; cursor: pointer; font-size: 14px; padding: 0 0 0 8px; }
+  .note-delete:active { color: #c0392b; }
+
+  /* ADD NOTE FORM */
+  .add-note-section { margin-top: 16px; background: var(--bg); border-radius: 12px; border: 1.5px solid var(--border); padding: 14px; }
+  .add-note-section textarea { width: 100%; border: none; background: none; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); resize: none; outline: none; min-height: 70px; line-height: 1.6; }
+  .add-note-section textarea::placeholder { color: var(--text-muted); }
+  .note-form-footer { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .reminder-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); cursor: pointer; user-select: none; flex-shrink: 0; }
+  .reminder-toggle input { display: none; }
+  .toggle-pill { width: 34px; height: 18px; background: var(--border); border-radius: 9px; position: relative; transition: background 0.2s; }
+  .toggle-pill::after { content: ''; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: white; top: 3px; left: 3px; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .reminder-toggle input:checked ~ .toggle-pill { background: var(--accent); }
+  .reminder-toggle input:checked ~ .toggle-pill::after { left: 19px; }
+  .date-input { border: 1.5px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text); background: var(--card); outline: none; flex: 1; min-width: 130px; }
+  .date-input:focus { border-color: var(--accent); }
+  .date-input:disabled { opacity: 0.4; }
+  .save-note-btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 8px 18px; font-size: 14px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; margin-left: auto; }
+  .save-note-btn:active { background: #a85e28; }
+
+  /* ADD PERSON MODAL */
+  .modal-sheet { background: var(--card); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 20px 20px 50px; animation: slideUp 0.22s ease; }
+  .modal-title { font-family: 'Lora', serif; font-size: 19px; font-weight: 600; margin-bottom: 18px; }
+  .field-label { font-size: 12px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .text-input { width: 100%; border: 1.5px solid var(--border); border-radius: 10px; padding: 11px 14px; font-size: 15px; font-family: 'DM Sans', sans-serif; color: var(--text); background: var(--bg); outline: none; margin-bottom: 16px; }
+  .text-input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+  .btn-cancel { flex: 1; padding: 12px; border: 1.5px solid var(--border); border-radius: 10px; background: none; font-size: 15px; font-family: 'DM Sans', sans-serif; color: var(--text-muted); cursor: pointer; }
+  .btn-primary { flex: 2; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; }
+
+  /* TODAY BANNER */
+  .today-banner { background: linear-gradient(135deg, var(--accent) 0%, #a85e28 100%); color: white; margin: 0 0 12px; border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .today-banner .bell { font-size: 20px; }
+  .today-banner-text { font-size: 13px; line-height: 1.4; }
+  .today-banner-text strong { display: block; font-size: 15px; margin-bottom: 1px; }
+
+  .section-divider { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+  /* GDRIVE SETUP */
+  .setup-banner {
+    background: var(--card); border: 1.5px dashed var(--border); border-radius: 12px;
+    padding: 16px; margin-bottom: 16px; text-align: center;
+  }
+  .setup-banner p { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 10px; }
+  .setup-banner strong { color: var(--text); }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #2c2416; color: white; padding: 10px 20px; border-radius: 20px;
+    font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.2s;
+    pointer-events: none; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* COPY MODAL */
+  .copy-sheet { background: var(--card); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 20px 20px 50px; animation: slideUp 0.22s ease; max-height: 80vh; overflow-y: auto; }
+  .copy-text-area { width: 100%; border: 1.5px solid var(--border); border-radius: 10px; padding: 12px; font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.6; color: var(--text); background: var(--bg); min-height: 160px; resize: none; outline: none; }
+  .copy-instructions { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin: 12px 0; background: var(--accent-light); border-radius: 8px; padding: 10px 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="app-title">Friendkeeper</div>
+      <div class="app-subtitle">Your people & their stories</div>
+    </div>
+    <div class="header-actions">
+      <button class="sync-btn" id="sync-btn" onclick="handleSync()" title="Sync with Google Drive">
+        <span id="sync-icon">☁️</span> <span id="sync-label">Sync</span>
+      </button>
+      <button class="add-btn" onclick="openAddPerson()">+</button>
+    </div>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input class="search-input" type="text" id="searchInput" placeholder="Search people…" oninput="renderPeople()" autocomplete="off">
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tab-people" onclick="switchTab('people')">People</button>
+  <button class="tab" id="tab-reminders" onclick="switchTab('reminders')">Reminders</button>
+</div>
+
+<div class="list-wrap" id="view-people">
+  <div id="today-banner-wrap"></div>
+  <div id="gdrive-setup-wrap"></div>
+  <div id="people-list"></div>
+</div>
+
+<div class="list-wrap" id="view-reminders" style="display:none">
+  <div id="reminders-list"></div>
+</div>
+
+<!-- Person detail -->
+<div class="overlay" id="overlay-person" onclick="handleOverlayClick(event,'overlay-person')">
+  <div class="sheet" id="person-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-avatar" id="sheet-avatar"></div>
+      <div class="sheet-person-name" id="sheet-name"></div>
+      <div class="sheet-header-actions">
+        <button class="icon-btn" onclick="openCopyNotes()" title="Copy notes for Apple Contacts">📋 Copy</button>
+        <button class="delete-person-btn" onclick="deletePerson()">Delete</button>
+        <button class="sheet-close" onclick="closeOverlay('overlay-person')">✕</button>
+      </div>
+    </div>
+    <div class="sheet-body">
+      <div class="section-label">Notes</div>
+      <div id="notes-list"></div>
+      <div class="add-note-section">
+        <textarea id="note-text" placeholder="What did they share? What do you want to remember?"></textarea>
+        <div class="note-form-footer">
+          <label class="reminder-toggle">
+            <input type="checkbox" id="note-reminder-toggle" onchange="toggleReminderDate()">
+            <span class="toggle-pill"></span>
+            <span>Remind me</span>
+          </label>
+          <input type="date" class="date-input" id="note-reminder-date" disabled>
+          <button class="save-note-btn" onclick="saveNote()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add person -->
+<div class="overlay" id="overlay-add" onclick="handleOverlayClick(event,'overlay-add')">
+  <div class="modal-sheet">
+    <div class="sheet-handle" style="margin-bottom:16px"></div>
+    <div class="modal-title">Add someone</div>
+    <div class="field-label">Name</div>
+    <input class="text-input" type="text" id="new-person-name" placeholder="e.g. Maribel" onkeydown="if(event.key==='Enter')addPerson()">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeOverlay('overlay-add')">Cancel</button>
+      <button class="btn-primary" onclick="addPerson()">Add person</button>
+    </div>
+  </div>
+</div>
+
+<!-- Copy notes modal -->
+<div class="overlay" id="overlay-copy" onclick="handleOverlayClick(event,'overlay-copy')">
+  <div class="copy-sheet">
+    <div class="sheet-handle" style="margin-bottom:16px"></div>
+    <div class="modal-title">Copy notes for Contacts</div>
+    <p class="copy-instructions">
+      📱 To paste into Apple Contacts:<br>
+      1. Tap <strong>Copy all</strong> below<br>
+      2. Open <strong>Contacts</strong> app → find this person<br>
+      3. Tap <strong>Edit</strong> → scroll to <strong>Notes</strong> → paste
+    </p>
+    <textarea class="copy-text-area" id="copy-textarea" readonly></textarea>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn-cancel" onclick="closeOverlay('overlay-copy')">Close</button>
+      <button class="btn-primary" onclick="copyNotesToClipboard()">Copy all</button>
+    </div>
+  </div>
+</div>
+
+<!-- Google Drive setup -->
+<div class="overlay" id="overlay-gdrive" onclick="handleOverlayClick(event,'overlay-gdrive')">
+  <div class="modal-sheet">
+    <div class="sheet-handle" style="margin-bottom:16px"></div>
+    <div class="modal-title">Connect Google Drive</div>
+    <p style="font-size:14px;color:var(--text-muted);line-height:1.6;margin-bottom:16px">
+      Friendkeeper saves your data as a file in your Google Drive. To set this up, you need a free Google API key. This takes about 5 minutes — instructions are in the README included with your download.
+    </p>
+    <div class="field-label">Paste your API key</div>
+    <input class="text-input" type="text" id="gdrive-api-key" placeholder="AIza…">
+    <div class="field-label">Paste your Client ID</div>
+    <input class="text-input" type="text" id="gdrive-client-id" placeholder="123456….apps.googleusercontent.com">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeOverlay('overlay-gdrive')">Later</button>
+      <button class="btn-primary" onclick="saveGDriveConfig()">Connect</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Google API loader ────────────────────────────────────────────
+let gapiReady = false;
+let gisReady = false;
+let tokenClient = null;
+let accessToken = null;
+let driveFileId = null;
+
+function loadGoogleAPIs(clientId, apiKey) {
+  return new Promise((resolve) => {
+    // Load GAPI
+    const gapiScript = document.createElement('script');
+    gapiScript.src = 'https://apis.google.com/js/api.js';
+    gapiScript.onload = () => {
+      gapi.load('client', async () => {
+        await gapi.client.init({ apiKey, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
+        gapiReady = true;
+        if (gisReady) resolve();
+      });
+    };
+    document.head.appendChild(gapiScript);
+
+    // Load GIS
+    const gisScript = document.createElement('script');
+    gisScript.src = 'https://accounts.google.com/gsi/client';
+    gisScript.onload = () => {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file',
+        callback: (resp) => {
+          if (resp.error) { showToast('Google sign-in failed'); return; }
+          accessToken = resp.access_token;
+          gapi.client.setToken({ access_token: accessToken });
+          syncToDrive();
+        }
+      });
+      gisReady = true;
+      if (gapiReady) resolve();
+    };
+    document.head.appendChild(gisScript);
+  });
+}
+
+// ── Storage helpers ──────────────────────────────────────────────
+const STORAGE_KEY = 'friendkeeper_v2';
+const CONFIG_KEY  = 'friendkeeper_config';
+
+function loadConfig() {
+  try { return JSON.parse(localStorage.getItem(CONFIG_KEY)) || {}; } catch { return {}; }
+}
+function saveConfig(cfg) { localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg)); }
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : { people: [], notes: [] };
+  } catch { return { people: [], notes: [] }; }
+}
+function save(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+let db = load();
+let config = loadConfig();
+let currentPersonId = null;
+
+// ── Utilities ────────────────────────────────────────────────────
+function initials(name) { return name.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+function fmtDate(iso) { if (!iso) return ''; const d = new Date(iso+'T00:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function todayIso() { return new Date().toISOString().slice(0,10); }
+function uid() { return Math.random().toString(36).slice(2)+Date.now().toString(36); }
+function getReminderState(d) { const t=todayIso(); return d<t?'past':d===t?'today':'future'; }
+
+function showToast(msg, duration=2400) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ── Google Drive sync ────────────────────────────────────────────
+const DRIVE_FILENAME = 'friendkeeper-data.json';
+
+async function initDrive() {
+  if (!config.apiKey || !config.clientId) return;
+  try {
+    await loadGoogleAPIs(config.clientId, config.apiKey);
+    setSyncState('ready');
+  } catch(e) { console.warn('Drive init failed', e); }
+}
+
+function setSyncState(state) {
+  const btn = document.getElementById('sync-btn');
+  const icon = document.getElementById('sync-icon');
+  const label = document.getElementById('sync-label');
+  if (state === 'ready')    { btn.className='sync-btn'; icon.textContent='☁️'; label.textContent='Sync'; }
+  if (state === 'syncing')  { btn.className='sync-btn syncing'; icon.textContent='🔄'; label.textContent='Syncing…'; }
+  if (state === 'synced')   { btn.className='sync-btn synced'; icon.textContent='✓'; label.textContent='Saved'; }
+  if (state === 'error')    { btn.className='sync-btn'; icon.textContent='⚠️'; label.textContent='Retry'; }
+}
+
+async function handleSync() {
+  if (!config.apiKey || !config.clientId) { openGDriveSetup(); return; }
+  if (!gapiReady || !gisReady) { showToast('Google APIs loading, please wait…'); return; }
+  if (!accessToken) { tokenClient.requestAccessToken(); return; }
+  syncToDrive();
+}
+
+async function syncToDrive() {
+  setSyncState('syncing');
+  try {
+    // Find or create file
+    if (!driveFileId) {
+      const list = await gapi.client.drive.files.list({
+        spaces: 'drive',
+        q: `name='${DRIVE_FILENAME}' and trashed=false`,
+        fields: 'files(id,name)'
+      });
+      if (list.result.files.length > 0) {
+        driveFileId = list.result.files[0].id;
+        // Load remote data and merge (remote wins for existing records, local additions are kept)
+        const get = await gapi.client.drive.files.get({ fileId: driveFileId, alt: 'media' });
+        const remote = JSON.parse(get.body);
+        db = mergeData(db, remote);
+        save(db);
+        renderPeople();
+        if (currentPersonId) renderNotes(currentPersonId);
+      }
+    }
+
+    // Upload current data
+    const content = JSON.stringify(db);
+    const blob = new Blob([content], {type:'application/json'});
+    const form = new FormData();
+    const meta = { name: DRIVE_FILENAME, mimeType: 'application/json' };
+    form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
+    form.append('file', blob);
+
+    const url = driveFileId
+      ? `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=multipart`
+      : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+    const method = driveFileId ? 'PATCH' : 'POST';
+
+    const resp = await fetch(url, { method, headers: { Authorization: `Bearer ${accessToken}` }, body: form });
+    const result = await resp.json();
+    if (result.id) driveFileId = result.id;
+    setSyncState('synced');
+    showToast('Saved to Google Drive ✓');
+    setTimeout(() => setSyncState('ready'), 3000);
+  } catch(e) {
+    console.error('Sync error', e);
+    setSyncState('error');
+    showToast('Sync failed — tap to retry');
+  }
+}
+
+function mergeData(local, remote) {
+  // Union of people, remote name wins on conflict
+  const peopleMap = {};
+  [...local.people, ...remote.people].forEach(p => { peopleMap[p.id] = p; });
+  // Union of notes, remote wins on conflict
+  const notesMap = {};
+  [...local.notes, ...remote.notes].forEach(n => { notesMap[n.id] = n; });
+  return { people: Object.values(peopleMap), notes: Object.values(notesMap) };
+}
+
+function openGDriveSetup() {
+  document.getElementById('gdrive-api-key').value = config.apiKey || '';
+  document.getElementById('gdrive-client-id').value = config.clientId || '';
+  document.getElementById('overlay-gdrive').classList.add('open');
+}
+
+async function saveGDriveConfig() {
+  const apiKey = document.getElementById('gdrive-api-key').value.trim();
+  const clientId = document.getElementById('gdrive-client-id').value.trim();
+  if (!apiKey || !clientId) { showToast('Please fill in both fields'); return; }
+  config = { apiKey, clientId };
+  saveConfig(config);
+  closeOverlay('overlay-gdrive');
+  renderGDriveBanner();
+  showToast('Connecting to Google Drive…');
+  await initDrive();
+  if (gapiReady && gisReady) tokenClient.requestAccessToken();
+}
+
+function renderGDriveBanner() {
+  const wrap = document.getElementById('gdrive-setup-wrap');
+  if (config.apiKey && config.clientId) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="setup-banner">
+    <p><strong>Connect Google Drive</strong> to back up your notes and access them from any device.</p>
+    <button class="btn-primary" style="width:100%;padding:11px" onclick="openGDriveSetup()">Set up Google Drive sync</button>
+  </div>`;
+}
+
+// ── Tab switching ────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('view-people').style.display = tab==='people'?'':'none';
+  document.getElementById('view-reminders').style.display = tab==='reminders'?'':'none';
+  document.getElementById('tab-people').classList.toggle('active', tab==='people');
+  document.getElementById('tab-reminders').classList.toggle('active', tab==='reminders');
+  if (tab==='reminders') renderReminders();
+}
+
+// ── People list ──────────────────────────────────────────────────
+function renderPeople() {
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+  let people = db.people.slice();
+  if (query) people = people.filter(p => p.name.toLowerCase().includes(query));
+  people.sort((a,b) => a.name.localeCompare(b.name));
+
+  const todayStr = todayIso();
+  const todayNotes = db.notes.filter(n => n.reminderDate===todayStr && !n.dismissed);
+  const bannerWrap = document.getElementById('today-banner-wrap');
+  if (todayNotes.length && !query) {
+    const names = [...new Set(todayNotes.map(n => { const p=db.people.find(p=>p.id===n.personId); return p?p.name.split(' ')[0]:''; }).filter(Boolean))];
+    bannerWrap.innerHTML = `<div class="today-banner" onclick="switchTab('reminders')">
+      <span class="bell">🔔</span>
+      <div class="today-banner-text"><strong>${todayNotes.length} reminder${todayNotes.length>1?'s':''} today</strong>${names.join(', ')}</div>
+    </div>`;
+  } else { bannerWrap.innerHTML = ''; }
+
+  const list = document.getElementById('people-list');
+  if (!people.length) {
+    list.innerHTML = `<div class="empty-state"><div class="emoji">${query?'🔍':'🌱'}</div><p>${query?'No one found.':'Add your first friend<br>with the + button above.'}</p></div>`;
+    return;
+  }
+  list.innerHTML = people.map(p => {
+    const notes = db.notes.filter(n => n.personId===p.id);
+    const pending = notes.filter(n => n.reminderDate && n.reminderDate>=todayStr && !n.dismissed);
+    const last = notes.sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
+    const preview = last ? last.text.replace(/\n/g,' ').slice(0,60)+(last.text.length>60?'…':'') : 'No notes yet';
+    return `<div class="person-card" onclick="openPerson('${p.id}')">
+      <div class="person-card-inner">
+        <div class="avatar">${initials(p.name)}</div>
+        <div class="person-info">
+          <div class="person-name">${p.name}</div>
+          <div class="person-preview">${preview}</div>
+        </div>
+        <div class="person-meta">
+          <span class="note-count">${notes.length} note${notes.length!==1?'s':''}</span>
+          ${pending.length?'<div class="reminder-dot"></div>':''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Reminders ────────────────────────────────────────────────────
+function renderReminders() {
+  const today = todayIso();
+  const reminders = db.notes.filter(n => n.reminderDate && !n.dismissed).sort((a,b)=>a.reminderDate.localeCompare(b.reminderDate));
+  const list = document.getElementById('reminders-list');
+  if (!reminders.length) { list.innerHTML=`<div class="empty-state"><div class="emoji">📅</div><p>No reminders set.</p></div>`; return; }
+  const past=reminders.filter(n=>n.reminderDate<today), todays=reminders.filter(n=>n.reminderDate===today), future=reminders.filter(n=>n.reminderDate>today);
+  let html='';
+  if (todays.length)  html+=`<div class="section-divider">Today</div>`+todays.map(r=>reminderCard(r,'today')).join('');
+  if (future.length)  html+=`<div class="section-divider">Upcoming</div>`+future.map(r=>reminderCard(r,'future')).join('');
+  if (past.length)    html+=`<div class="section-divider">Past</div>`+past.map(r=>reminderCard(r,'past')).join('');
+  list.innerHTML = html;
+}
+
+function reminderCard(note, state) {
+  const p = db.people.find(p=>p.id===note.personId);
+  const name = p?p.name:'Unknown';
+  const d = new Date(note.reminderDate+'T00:00:00');
+  return `<div class="reminder-card" onclick="openPerson('${note.personId}')">
+    <div class="reminder-card-inner">
+      <div class="reminder-date-block ${state}">
+        <div class="rdate-day">${d.getDate()}</div>
+        <div class="rdate-mon">${d.toLocaleDateString('en-US',{month:'short'})}</div>
+      </div>
+      <div class="reminder-body">
+        <div class="reminder-person">${name}</div>
+        <div class="reminder-text">${note.text.slice(0,120)}${note.text.length>120?'…':''}</div>
+      </div>
+      <button class="reminder-dismiss" onclick="event.stopPropagation();dismissReminder('${note.id}')">Done</button>
+    </div>
+  </div>`;
+}
+
+function dismissReminder(noteId) {
+  const n = db.notes.find(n=>n.id===noteId);
+  if (n) { n.dismissed=true; save(db); renderReminders(); renderPeople(); }
+}
+
+// ── Person detail ────────────────────────────────────────────────
+function openPerson(id) {
+  currentPersonId = id;
+  const p = db.people.find(p=>p.id===id);
+  if (!p) return;
+  document.getElementById('sheet-avatar').textContent = initials(p.name);
+  document.getElementById('sheet-name').textContent = p.name;
+  document.getElementById('note-text').value = '';
+  document.getElementById('note-reminder-toggle').checked = false;
+  document.getElementById('note-reminder-date').disabled = true;
+  document.getElementById('note-reminder-date').value = '';
+  renderNotes(id);
+  document.getElementById('overlay-person').classList.add('open');
+}
+
+function renderNotes(personId) {
+  const notes = db.notes.filter(n=>n.personId===personId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const list = document.getElementById('notes-list');
+  if (!notes.length) { list.innerHTML=`<div style="color:var(--text-muted);font-size:14px;padding:8px 0 12px">No notes yet — add the first one below.</div>`; return; }
+  list.innerHTML = notes.map(n => {
+    const rs = n.reminderDate ? getReminderState(n.reminderDate) : null;
+    const badge = n.reminderDate && !n.dismissed ? `<span class="note-reminder-badge">🔔 ${fmtDate(n.reminderDate)}${rs==='past'?' (past)':rs==='today'?' (today)':''}</span>` : '';
+    return `<div class="note-item">
+      <div class="note-item-text">${escHtml(n.text)}</div>
+      <div class="note-item-footer">
+        <span class="note-item-date">${fmtDate(n.createdAt.slice(0,10))}</span>
+        <div style="display:flex;gap:6px;align-items:center">${badge}<button class="note-delete" onclick="deleteNote('${n.id}')">🗑</button></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+function toggleReminderDate() {
+  const on = document.getElementById('note-reminder-toggle').checked;
+  const di = document.getElementById('note-reminder-date');
+  di.disabled = !on;
+  if (on && !di.value) di.value = todayIso();
+}
+
+function saveNote() {
+  const text = document.getElementById('note-text').value.trim();
+  if (!text) return;
+  const hasReminder = document.getElementById('note-reminder-toggle').checked;
+  const reminderDate = hasReminder ? document.getElementById('note-reminder-date').value : null;
+  db.notes.push({ id:uid(), personId:currentPersonId, text, reminderDate:reminderDate||null, dismissed:false, createdAt:new Date().toISOString() });
+  save(db);
+  document.getElementById('note-text').value = '';
+  document.getElementById('note-reminder-toggle').checked = false;
+  document.getElementById('note-reminder-date').disabled = true;
+  document.getElementById('note-reminder-date').value = '';
+  renderNotes(currentPersonId);
+  renderPeople();
+  showToast('Note saved');
+}
+
+function deleteNote(noteId) {
+  if (!confirm('Delete this note?')) return;
+  db.notes = db.notes.filter(n=>n.id!==noteId);
+  save(db);
+  renderNotes(currentPersonId);
+  renderPeople();
+}
+
+function deletePerson() {
+  if (!confirm('Delete this person and all their notes?')) return;
+  db.people = db.people.filter(p=>p.id!==currentPersonId);
+  db.notes = db.notes.filter(n=>n.personId!==currentPersonId);
+  save(db);
+  closeOverlay('overlay-person');
+  renderPeople();
+}
+
+// ── Copy notes for Apple Contacts ────────────────────────────────
+function openCopyNotes() {
+  const p = db.people.find(p=>p.id===currentPersonId);
+  if (!p) return;
+  const notes = db.notes.filter(n=>n.personId===currentPersonId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  if (!notes.length) { showToast('No notes to copy yet'); return; }
+  const text = notes.map(n => {
+    const dateStr = fmtDate(n.createdAt.slice(0,10));
+    const reminder = n.reminderDate && !n.dismissed ? ` [reminder: ${fmtDate(n.reminderDate)}]` : '';
+    return `[${dateStr}]${reminder}\n${n.text}`;
+  }).join('\n\n──────────\n\n');
+  document.getElementById('copy-textarea').value = text;
+  document.getElementById('overlay-copy').classList.add('open');
+}
+
+function copyNotesToClipboard() {
+  const ta = document.getElementById('copy-textarea');
+  ta.select();
+  try {
+    navigator.clipboard.writeText(ta.value).then(() => {
+      showToast('Copied! Now paste into Apple Contacts.');
+      closeOverlay('overlay-copy');
+    }).catch(() => {
+      document.execCommand('copy');
+      showToast('Copied! Now paste into Apple Contacts.');
+      closeOverlay('overlay-copy');
+    });
+  } catch { showToast('Select the text above and copy manually'); }
+}
+
+// ── Add person ───────────────────────────────────────────────────
+function openAddPerson() {
+  document.getElementById('new-person-name').value = '';
+  document.getElementById('overlay-add').classList.add('open');
+  setTimeout(() => document.getElementById('new-person-name').focus(), 100);
+}
+
+function addPerson() {
+  const name = document.getElementById('new-person-name').value.trim();
+  if (!name) return;
+  const person = { id:uid(), name, createdAt:new Date().toISOString() };
+  db.people.push(person);
+  save(db);
+  closeOverlay('overlay-add');
+  renderPeople();
+  openPerson(person.id);
+}
+
+// ── Overlay ──────────────────────────────────────────────────────
+function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+function handleOverlayClick(e, id) { if (e.target===document.getElementById(id)) closeOverlay(id); }
+
+// ── Init ─────────────────────────────────────────────────────────
+renderPeople();
+renderGDriveBanner();
+if (config.apiKey && config.clientId) initDrive();
+</script>
+</body>
+</html>
