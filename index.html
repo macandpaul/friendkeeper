@@ -390,10 +390,18 @@ function saveConfig(cfg) { localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg))
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : { people: [], notes: [] };
-  } catch { return { people: [], notes: [] }; }
+    const data = raw ? JSON.parse(raw) : {};
+    return {
+      people: data.people || [],
+      notes: data.notes || [],
+      deletedIds: data.deletedIds || []
+    };
+  } catch { return { people: [], notes: [], deletedIds: [] }; }
 }
 function save(data) {
+  // Prune deletedIds older than 90 days so the list never grows unbounded
+  const cutoff = new Date(Date.now() - 90*24*60*60*1000).toISOString();
+  data.deletedIds = (data.deletedIds || []).filter(d => d.deletedAt > cutoff);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
@@ -495,18 +503,32 @@ async function syncToDrive() {
   } catch(e) {
     console.error('Sync error', e);
     setSyncState('error');
-    showToast('Sync failed — tap to retry');
+    showToast('Sync failed: ' + (e.message || 'unknown error') + ' — tap to retry', 4000);
   }
 }
 
 function mergeData(local, remote) {
-  // Union of people, remote name wins on conflict
+  // Combine deleted ID lists from both sides
+  const deletedMap = {};
+  [...(local.deletedIds || []), ...(remote.deletedIds || [])].forEach(d => {
+    if (!deletedMap[d.id] || d.deletedAt > deletedMap[d.id].deletedAt) deletedMap[d.id] = d;
+  });
+  const deletedIds = Object.values(deletedMap);
+  const deletedSet = new Set(deletedIds.map(d => d.id));
+
+  // Union of people, excluding any that were deleted on either device
   const peopleMap = {};
-  [...local.people, ...remote.people].forEach(p => { peopleMap[p.id] = p; });
-  // Union of notes, remote wins on conflict
+  [...local.people, ...remote.people].forEach(p => {
+    if (!deletedSet.has(p.id)) peopleMap[p.id] = p;
+  });
+
+  // Union of notes, excluding deleted ones
   const notesMap = {};
-  [...local.notes, ...remote.notes].forEach(n => { notesMap[n.id] = n; });
-  return { people: Object.values(peopleMap), notes: Object.values(notesMap) };
+  [...local.notes, ...remote.notes].forEach(n => {
+    if (!deletedSet.has(n.id)) notesMap[n.id] = n;
+  });
+
+  return { people: Object.values(peopleMap), notes: Object.values(notesMap), deletedIds };
 }
 
 function openGDriveSetup() {
@@ -696,6 +718,8 @@ function saveNote() {
 function deleteNote(noteId) {
   if (!confirm('Delete this note?')) return;
   db.notes = db.notes.filter(n=>n.id!==noteId);
+  db.deletedIds = db.deletedIds || [];
+  db.deletedIds.push({ id: noteId, deletedAt: new Date().toISOString() });
   save(db);
   renderNotes(currentPersonId);
   renderPeople();
@@ -703,6 +727,14 @@ function deleteNote(noteId) {
 
 function deletePerson() {
   if (!confirm('Delete this person and all their notes?')) return;
+  const now = new Date().toISOString();
+  db.deletedIds = db.deletedIds || [];
+  // Tombstone the person
+  db.deletedIds.push({ id: currentPersonId, deletedAt: now });
+  // Tombstone all their notes
+  db.notes.filter(n=>n.personId===currentPersonId).forEach(n => {
+    db.deletedIds.push({ id: n.id, deletedAt: now });
+  });
   db.people = db.people.filter(p=>p.id!==currentPersonId);
   db.notes = db.notes.filter(n=>n.personId!==currentPersonId);
   save(db);
@@ -769,4 +801,3 @@ if (config.apiKey && config.clientId) initDrive();
 </script>
 </body>
 </html>
-
