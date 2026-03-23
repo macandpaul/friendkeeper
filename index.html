@@ -447,7 +447,7 @@ async function handleSync() {
 async function syncToDrive() {
   setSyncState('syncing');
   try {
-    // Find or create file
+    // Step 1: Find the file on Drive if we don't have its ID yet
     if (!driveFileId) {
       const list = await gapi.client.drive.files.list({
         spaces: 'drive',
@@ -456,17 +456,24 @@ async function syncToDrive() {
       });
       if (list.result.files.length > 0) {
         driveFileId = list.result.files[0].id;
-        // Load remote data and merge (remote wins for existing records, local additions are kept)
+      }
+    }
+
+    // Step 2: Always download and merge first so we never lose data from another device
+    if (driveFileId) {
+      try {
         const get = await gapi.client.drive.files.get({ fileId: driveFileId, alt: 'media' });
         const remote = JSON.parse(get.body);
         db = mergeData(db, remote);
         save(db);
         renderPeople();
         if (currentPersonId) renderNotes(currentPersonId);
+      } catch(e) {
+        console.warn('Could not download remote file, uploading local only', e);
       }
     }
 
-    // Upload current data
+    // Step 3: Upload the merged result back to Drive
     const content = JSON.stringify(db);
     const blob = new Blob([content], {type:'application/json'});
     const form = new FormData();
@@ -483,7 +490,7 @@ async function syncToDrive() {
     const result = await resp.json();
     if (result.id) driveFileId = result.id;
     setSyncState('synced');
-    showToast('Saved to Google Drive ✓');
+    showToast('Synced ✓');
     setTimeout(() => setSyncState('ready'), 3000);
   } catch(e) {
     console.error('Sync error', e);
